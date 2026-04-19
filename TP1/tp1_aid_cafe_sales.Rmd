@@ -1,0 +1,492 @@
+---
+title: "AID_cafe_sales"
+output: html_document
+date: "2026-04-02"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(lubridate)
+```
+
+## Datos
+
+Vamos a usar el archivo dirty_cafe_sales.csv. 
+
+```{r}
+library(readr)
+cafe_sales <- read_delim("dirty_cafe_sales.csv", delim = ",", trim_ws = TRUE)
+
+```
+
+## Parte A – Exploración y calidad de datos
+### 1. Lectura e inspección.
+
+- a) Las dimensiones son: 10000 X 8
+```{r}
+dim(cafe_sales)
+```
+- b) Tipo de variables:
+**Fecha: ** Transaction Date
+**Categórica: ** Location, Payment Method, Item, Transaction ID
+**Numérica: ** Quantity, Price Per Unit, Total Spent
+```{r}
+head(cafe_sales)
+```
+
+```{r}
+str(cafe_sales)
+```
+NOTA: No obstante, las variables están registradas como **Char**
+
+
+### 2. Valores raros y faltantes.
+
+#### a. Valores que contiene cada variable
+
+```{r}
+attach(cafe_sales)
+table(Item)
+print("Valores nulos Item:"); sum(is.na(Item))
+```
+```{r}
+table(Quantity)
+print("Valores nulos Quantity:"); sum(is.na(Quantity))
+```
+```{r}
+table(`Payment Method`)
+print("Valores nulos Payment Method:"); sum(is.na(`Payment Method`))
+
+```
+```{r}
+table(Location)
+print("Valores nulos Location:"); sum(is.na(`Location`))
+```
+#### b. Registros sucios
+
+
+|Variable|ERROR|UNKNOWN|na|
+|---------|---------|---------|---------|
+|Item|292|344|333|
+|Quantity|170|171|138|
+|Payment Method|306|293|2579|
+|Location|358|338|3265|
+
+#### c. Gráficos
+```{r}
+barplot(table(Item), xlab="Item", ylab = "count")
+barplot(table(Quantity), xlab="Quantity", ylab = "count")
+barplot(table(`Payment Method`), xlab="Payment Method", ylab = "count")
+barplot(table(Location), xlab="Location", ylab = "count")
+```
+### 3.
+
+#### a. Item más frecuente: JUICE
+```{r}
+
+print(table(select(filter(cafe_sales,!is.na(Item) & Item != "UNKNOWN" & Item != "ERROR"),Item)))
+print("El valor más frecuente en Item:")
+which.max(table(select(filter(cafe_sales,!is.na(Item) & Item != "UNKNOWN" & Item != "ERROR"),Item)))
+
+```
+#### b. Quantity menos frecuente: 1
+```{r}
+print("El valor menos frecuente en Quantity:")
+
+print(which.min(table(select(filter(cafe_sales,!is.na(Quantity) & Quantity != "UNKNOWN" & Quantity != "ERROR"),Quantity))))
+```
+#### c. Transacciones(Payment Method) igual a Cash: 2258
+```{r}
+table(`Payment Method`)["Cash"]
+```
+#### d. Cantidad de registros sucios en *Location*: 3961
+```{r}
+
+# Location
+location_sucio <- select(filter(cafe_sales, is.na(Location) | Location == "UNKNOWN" | Location == "ERROR"),Location)
+
+cant_sucio <- dim(location_sucio)[1]
+
+total <- dim(cafe_sales)[1]
+
+#Cantidad de valores sucios
+print("Total de registros:") ; total
+
+print("Cantidad de valores sucios:") ; cant_sucio
+
+print("Porcentaje de valores sucios:"); (cant_sucio/total)*100
+
+```
+
+
+### 4. Resumen numérico
+
+#### a. Conversión *Price Per Unit*
+```{r}
+# conversion de chr a numeric
+price_per_unit <- as.numeric(`Price Per Unit`)
+
+# se omiten valores faltantes
+price_per_unit <- na.omit(price_per_unit)
+
+# media
+mean(price_per_unit)
+
+# mediana
+median(price_per_unit)
+
+# Desvio estandar
+sd(price_per_unit)
+
+
+```
+#### b. Resumen de *Total Spent*
+```{r}
+# conversion de chr a numeric
+total_spent <- as.numeric(`Total Spent`)
+
+# se omiten valores faltantes
+total_spent <- na.omit(total_spent)
+
+# Resumen de datos (min, max, quartiles)
+summary(total_spent)
+```
+### 5. Valores atípicos de *Total Spent*
+
+```{r}
+primer_quartil <- quantile(total_spent, 0.25)
+tercer_quartil <- quantile(total_spent, 0.75)
+
+# Cota superior para detección de outliers
+th_alto <- tercer_quartil + 1.5* IQR(total_spent)
+
+# Cota inferior para detección de outliers
+th_bajo <- primer_quartil - 1.5* IQR(total_spent)
+
+# Filtrar outliers
+outliers_iqr <- total_spent[(total_spent < th_bajo | total_spent > th_alto)]
+
+print("cant de outliers:")
+print(length(outliers_iqr))
+
+```
+-b1 Las cantidad de outlier es igual a 259
+-b2 valores por encima de 24, en particular el valor 25 es el único valor atípico, ya que le máximo es 25.
+
+```{r}
+# Tamaño
+length(outliers_iqr)
+
+# Umbral de detección
+th_alto
+```
+### 6. Patrones temporales
+#### a
+```{r}
+# limpio la fecha
+cafe_sales <- mutate(cafe_sales, `Transaction Date` =  if_else(is.na(`Transaction Date`) | `Transaction Date` == "UNKNOWN" | `Transaction Date` == "ERROR", NA, `Transaction Date`))
+
+# Conversión a fecha
+transaction_date <- as.Date(cafe_sales$`Transaction Date`)
+
+# Omito los valores nulos
+transaction_date <- na.omit(transaction_date)
+
+
+```
+#### b
+```{r}
+# Transacciones por día de la semana
+# hist(wday(transaction_date)) # Gráfico
+# 
+# table(wday(transaction_date)) # Tabla
+
+print(table(wday(transaction_date)))
+# vAlores máximos
+print("día con la mayor transacción")
+print(which.max(table(wday(transaction_date))))
+
+# vAlores máximos 
+print("día con la menor número de transacciónes")
+which.min(table(wday(transaction_date))) 
+```
+
+Si se considera el **viernes** como el día 5 de la semana, entonces
+hubo 1380 trasancciones ese día. 
+
+
+-c No se aprecia una tendencia clara en la cantidad de transacciones por mes. 
+```{r}
+# Transacciones por mes
+barplot(table(month(transaction_date))) # Gráfico
+table(month(transaction_date)) # tabla
+
+# vAlores máximos
+print("Mes con la mayor transacción")
+print(which.max(table(month(transaction_date))))
+
+# vAlores máximos 
+print("Mes con la menor número de transacciónes")
+which.min(table(month(transaction_date))) 
+```
+## Parte B – Limpieza e imputación con reglas
+
+### 1. Paso 1: completar Price Per Unit por menú.
+
+```{r}
+#copio el dataset
+cafe_sales_cp <- cafe_sales
+
+# Lista de precios
+# Agrupo una lista de productos y precios
+grupo_item <- group_by(cafe_sales_cp, Item, `Price Per Unit`)
+item_precio <- summarise(grupo_item)
+
+# Quito valores sucios de la lista de precios
+item_precio <- filter(item_precio,(!is.na(Item) & (Item != "UNKNOWN") & (Item != "ERROR")))
+item_precio <- filter(item_precio,(!is.na(`Price Per Unit`) & (`Price Per Unit` != "UNKNOWN") & (`Price Per Unit` != "ERROR")))
+
+# Función: Dado un Item, recuperar el precio a partir
+# de la lista de precio
+# arg: item -> vector
+# return: precio -> vector
+imputacion_precio <- function(x) {
+  
+  #creo un vector vació donde guardare mis valores a reemplazar
+  item_imput <- c()
+  
+  for(i in c(1:length(x))){
+    
+    # precio es nulo?
+    if(is.na(x[i]) | (x[i] == "UNKNOWN") | (x[i] == "ERROR")){
+      
+      # Su precio se encuentra en la lista de precios?
+      if(cafe_sales_cp[i,]$Item %in% item_precio$Item){
+        
+        imput <- pull(item_precio[item_precio$Item == cafe_sales_cp[i,]$Item,"Price Per Unit"])
+        item_imput <- c(item_imput, imput)
+        
+      }else{ 
+        
+        # Es NA pero el Item no lo encuentro en la lista de precios
+        item_imput <- c(item_imput, NA)
+    }
+      }else{
+      
+      # Si no es nulo, entonces:
+      item_imput <- c(item_imput,x[i])
+    }
+}
+ 
+  return(item_imput)
+}
+
+# Aplicar imputación a precio
+cafe_sales_cp <-cafe_sales_cp %>% mutate(`Price Per Unit` = imputacion_precio(`Price Per Unit`))
+
+
+```
+
+```{r}
+sum(is.na(cafe_sales_cp$`Price Per Unit`))
+```
+
+
+### 2. Paso 2: completar Quantity, Price Per Unit y Total Spent cuando falte sólo una.
+
+
+
+```{r}
+str(cafe_sales_cp)
+# Convertir a tipo numerico
+cafe_sales_cp$Quantity <- as.numeric(cafe_sales_cp$Quantity)
+cafe_sales_cp$`Price Per Unit` <- as.numeric(cafe_sales_cp$`Price Per Unit`)
+cafe_sales_cp$`Total Spent` <- as.numeric(cafe_sales_cp$`Total Spent`)
+
+
+  # Total gastado: Quantity * `Price Per Unit`
+cafe_sales_cp$`Total Spent` <- ifelse(is.na(cafe_sales_cp$`Total Spent`) & !is.na(cafe_sales_cp$Quantity) & !is.na(cafe_sales_cp$`Price Per Unit`), (cafe_sales_cp$Quantity * cafe_sales_cp$`Price Per Unit`),cafe_sales_cp$`Total Spent` )
+  
+# Cantidades: `Total Spent` / `Price Per Unit`
+cafe_sales_cp$Quantity <- ifelse(!is.na(cafe_sales_cp$`Total Spent`) & is.na(cafe_sales_cp$Quantity) & !is.na(cafe_sales_cp$`Price Per Unit`), cafe_sales_cp$`Total Spent` / cafe_sales_cp$`Price Per Unit`,cafe_sales_cp$Quantity)
+
+# Precio por unidad: `Total Spent` / Quantity
+cafe_sales_cp$`Price Per Unit` <- ifelse(!is.na(cafe_sales_cp$`Total Spent`) & !is.na(cafe_sales_cp$Quantity) & is.na(cafe_sales_cp$`Price Per Unit`),cafe_sales_cp$`Total Spent` / cafe_sales_cp$Quantity, cafe_sales_cp$`Price Per Unit`)
+  
+  
+# si existe Quantity en decimal, hay que reemplzar por NA
+cafe_sales_cp$Quantity <- ifelse((cafe_sales_cp$Quantity / round(cafe_sales_cp$Quantity)) != 1, NA, cafe_sales_cp$Quantity )
+
+
+```
+
+### 3. Paso 3: completar Item usando Price Per Unit.
+
+
+```{r} 
+# Armo una segunda lista de precios
+# Agrupo una lista de productos y precios
+grupo_precios <- group_by(cafe_sales_cp, `Price Per Unit`, Item)
+item_precio_2 <- summarise(grupo_precios)
+
+# Quito valores sucios
+item_precio_2 <- filter(item_precio_2,(!is.na(Item) & (Item != "UNKNOWN") & (Item != "ERROR")))
+item_precio_2 <- filter(item_precio_2,(!is.na(`Price Per Unit`) & (`Price Per Unit` != "UNKNOWN") & (`Price Per Unit` != "ERROR")))
+
+# Asumo un único producto para un precio dado
+item_precio_2 <- filter(item_precio_2,(Item != "Juice") & (Item != "Sandwich"))
+
+```
+
+```{r}
+
+# Función: Dado un Precio, recuperar el Item a partir
+# de la lista de precio
+# arg: precio -> vector
+# return: item -> vector
+imputacion_item <- function(x) {
+  
+  #creo un vector vació donde guardare mis valores a reemplazar
+  item_imput <- c()
+  
+  
+  for(i in c(1:length(x))){
+    
+    # item es nulo?
+    if(is.na(x[i]) | (x[i] == "UNKNOWN") | (x[i] == "ERROR")){
+      
+      # Su precio se encuentra en la lista de precios?
+      if(cafe_sales_cp[i,]$`Price Per Unit` %in% item_precio_2$`Price Per Unit`){
+        
+        # Recupuero el item desde la lista de precio
+        imput <- pull(item_precio_2[item_precio_2$`Price Per Unit` == cafe_sales_cp[i,]$`Price Per Unit`,"Item"])
+        item_imput <- c(item_imput, imput)
+      }else{ 
+        
+        # Es NA pero no lo encuentra en la lista de precios, => set NA
+        item_imput <- c(item_imput, NA)
+    }
+      }else{
+      
+      # Si no es nulo => mantengo el mismo valor
+      item_imput <- c(item_imput,x[i])
+    }
+  }
+ 
+  return(item_imput)
+}
+
+# Aplicar imputación a Item dado el precio.
+cafe_sales_cp <-cafe_sales_cp %>% mutate(Item = imputacion_item(Item))
+
+
+```
+
+
+
+### 4. Checkpoint
+"Price per unit" sucios = 6
+"Quantity" sucios = 23 
+```{r}
+# Cuantos NA hay "Price per unit"
+print("Price per unit sucios")
+print(sum(is.na(cafe_sales_cp$`Price Per Unit`)))
+
+# Cuantos NA hay "Quantity"
+print("Quantity sucios")
+print(sum(is.na(cafe_sales_cp$Quantity)))
+
+```
+
+
+### 5. Paso 4: 
+```{r}
+
+
+# Función para calcular la moda
+mode_num <- function(x) {return(as.numeric(names(which.max(table(x)))))}
+mode_text <- function(x) {return(as.character(names(which.max(table(x)))))}
+mode_fecha <- function(x) {return(as.Date(names(which.max(table(x)))))}
+
+###### Limpieza
+# Item
+item_limpio <- select(filter(cafe_sales_cp, !is.na(Item) & Item != "UNKNOWN" & Item != "ERROR"),Item)
+# Quantity
+quantity_limpio <- select(filter(cafe_sales_cp, !is.na(Quantity) & Quantity != "UNKNOWN" & Quantity != "ERROR"),Quantity)
+# price_unit
+price_unit_limpio <- select(filter(cafe_sales_cp, !is.na(`Price Per Unit`) & `Price Per Unit` != "UNKNOWN" & `Price Per Unit` != "ERROR"),`Price Per Unit`)
+# `Total Spent`
+total_spent_limpio <- select(filter(cafe_sales_cp, !is.na(`Total Spent`) & `Total Spent` != "UNKNOWN" & `Total Spent` != "ERROR"),`Total Spent`)
+# `Payment Method`
+pay_meth_limpio <- select(filter(cafe_sales_cp, !is.na(`Payment Method`) & `Payment Method` != "UNKNOWN" & `Payment Method` != "ERROR"),`Payment Method`)
+# Location
+location_limpio <- select(filter(cafe_sales_cp, !is.na(Location) & Location != "UNKNOWN" & Location != "ERROR"),Location)
+# `Transaction Date`
+trans_date_limpio <- select(filter(cafe_sales_cp, !is.na(`Transaction Date`) & `Transaction Date` != "UNKNOWN" & `Transaction Date` != "ERROR"),`Transaction Date`)
+
+#Calcular la moda
+moda_item <- mode_text(item_limpio)
+moda_quantity <- mode_num(quantity_limpio)
+moda_price_unit <- mode_num(price_unit_limpio)
+moda_total <- mode_num(total_spent_limpio)
+moda_pay_meth <- mode_text(pay_meth_limpio)
+moda_location <- mode_text(location_limpio)
+moda_date <- mode_fecha(trans_date_limpio)
+
+# Imputación por moda mientras que esté sucio
+cafe_sales_cp <- mutate(cafe_sales_cp,Item = ifelse(is.na(Item) | Item == "UNKNOWN" | Item == "ERROR",moda_item, Item))
+
+cafe_sales_cp <- mutate(cafe_sales_cp,Quantity = ifelse(is.na(Quantity) | Quantity == "UNKNOWN" | Quantity == "ERROR",moda_quantity, Quantity))
+
+cafe_sales_cp <- mutate(cafe_sales_cp,`Price Per Unit` = ifelse(is.na(`Price Per Unit`) | `Price Per Unit` == "UNKNOWN" | `Price Per Unit` == "ERROR",moda_price_unit, `Price Per Unit`))
+
+cafe_sales_cp <- mutate(cafe_sales_cp,`Total Spent` = ifelse(is.na(`Total Spent`) | `Total Spent` == "UNKNOWN" | `Total Spent` == "ERROR",moda_total, `Total Spent`))
+
+cafe_sales_cp <- mutate(cafe_sales_cp,`Payment Method` = ifelse(is.na(`Payment Method`) | `Payment Method` == "UNKNOWN" | `Payment Method` == "ERROR",moda_pay_meth, `Payment Method`))
+
+cafe_sales_cp <- mutate(cafe_sales_cp,Location = ifelse(is.na(Location) | Location == "UNKNOWN" | Location == "ERROR",moda_location, Location))
+
+
+```
+
+```{r}
+# conversion a chart
+cafe_sales_cp$`Transaction Date` <- as.character(cafe_sales_cp$`Transaction Date`)
+str(cafe_sales_cp)
+
+# Imputacion de fecha
+cafe_sales_cp <- mutate(cafe_sales_cp, `Transaction Date` =  if_else(is.na(`Transaction Date`) | `Transaction Date` == "UNKNOWN" | `Transaction Date` == "ERROR", as.character(moda_date), `Transaction Date`))
+
+# cafe_sales_cp <- mutate(cafe_sales_cp, `Transaction Date` =  if_else(is.na(`Transaction Date`), as.character(moda_date) ,`Transaction Date`))
+
+
+
+```
+### 6. verificacion
+
+```{r}
+print("Valores nulos de todas las variables")
+print("Item")
+print(sum(is.na(cafe_sales_cp$Item)))
+
+print("Quantity")
+print(sum(is.na(cafe_sales_cp$Quantity)))
+
+print("`Price Per Unit`")
+print(sum(is.na(cafe_sales_cp$`Price Per Unit`)))
+
+print("`Total Spent`")
+print(sum(is.na(cafe_sales_cp$`Total Spent`)))
+
+print("`Payment Method`")
+print(sum(is.na(cafe_sales_cp$`Payment Method`)))
+
+print("Location")
+print(sum(is.na(cafe_sales_cp$Location)))
+
+print("`Transaction Date`")
+print(sum(is.na(cafe_sales_cp$`Transaction Date`)))
+
+```
+
