@@ -1,0 +1,349 @@
+---
+title: "cohorte_estudio"
+author: "Maximiliano Bustos"
+date: "2026-04-19"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Datos
+
+Vamos a usar el archivo  *TP2_AID_2026_cohorte_estudio.csv*
+
+```{r}
+library(readr)
+library(tidyverse)
+cohorte_estudio <- read_delim("./dataTP2/TP2_AID_2026_cohorte_estudio.csv", delim = ",", trim_ws = TRUE)
+
+```
+```{r}
+spec(cohorte_estudio)
+```
+
+```{r}
+attach(cohorte_estudio)
+
+```
+## Q06 Media del puntaje final
+```{r}
+mean(puntaje_final)
+```
+## Q07 La mediana de la ansiedad
+```{r}
+median(ansiedad_score)
+```
+## Q08 El mayor desvio entre horas_estudio, asistencia_pct, ansiedad_score y promedio_prev
+
+ansiedad_score es el que tiene mayor desvío.
+```{r}
+#sd(c(horas_estudio, asistencia_pct, ansiedad_score, promedio_prev))
+#cohorte_estudio[["horas_estudio"]] #, "asistencia_pct", "ansiedad_score", "promedio_prev"]]
+
+print(sd(horas_estudio))
+print(sd(asistencia_pct))
+print(sd(ansiedad_score))
+print(sd(promedio_prev))
+
+```
+## Q09 Proporción de estudiantes aprobados
+```{r}
+table(aprobado)
+```
+```{r}
+sum(table(aprobado))
+```
+```{r}
+cantidad_aprobados = count(select(filter(cohorte_estudio, aprobado == "Aprobado"), aprobado))
+total_alumnado = length(aprobado)
+
+porcentaje_aprobado = cantidad_aprobados / total_alumnado
+
+print(paste("El porcentaje de aprobados es: ", porcentaje_aprobado))
+
+```
+## Q10 La sede mas frecuente en la cohorte es
+
+```{r}
+names(which.max(table(sede)))
+max(table(sede))
+```
+
+## Q11 La variable con correlacion positiva mas alta con puntaje_final
+
+Son las horas semanales de estudio.
+
+```{r}
+cohorte_estudio_num <- cohorte_estudio %>% select_if(is.numeric)
+cor(cohorte_estudio_num)
+```
+
+## Q13
+
+```{r}
+set.seed(2026)
+sd_poblacional <- 11.5 # conocido
+
+# Simulamos datos donde la media real es 10.5, sd=11.5, n=40
+# muestra <- rnorm(40, mean = 10.5, sd = sd_poblacional)
+
+media_muestra <- mean(puntaje_final)
+n <- length(puntaje_final)
+media_hipotetica <- 72
+
+# Estadístico z para H0: mu = 72 vs H1: mu > 72
+error_estandar <- sd_poblacional / sqrt(n)
+
+z_stat <- (media_muestra - media_hipotetica) / error_estandar
+#p_valor <- 2 * (1 - pnorm(abs(z_stat)))  # prueba a dos colas
+p_valor <- (1 - pnorm(abs(z_stat)))  # prueba a cola derecha.
+p_valor
+```
+## Q14
+
+```{r}
+set.seed(2026)
+sd_poblacional <- sd(sueno_hs) # conocido
+
+# Simulamos datos donde la media real es 10.5, sd=11.5, n=40
+# muestra <- rnorm(40, mean = 10.5, sd = sd_poblacional)
+
+media_muestra <- mean(sueno_hs)
+n <- length(sueno_hs)
+media_hipotetica <- 6.8
+
+# Estadístico z para H0: mu = 72 vs H1: mu > 72
+error_estandar <- sd_poblacional / sqrt(n)
+
+z_stat <- (media_muestra - media_hipotetica) / error_estandar
+p_valor <- 2 * (1 - pnorm(abs(z_stat)))  # prueba a dos colas
+
+p_valor
+```
+
+## Q15
+
+```{r}
+# Test de Shapiro-Wilk 
+shapiro_result <- shapiro.test(ansiedad_score)
+print(shapiro_result)
+```
+## Q16 Al aplicar Shapiro-Wilk sobre puntaje_final
+
+
+```{r}
+# Test de Shapiro-Wilk 
+shapiro_result <- shapiro.test(puntaje_final)
+print(shapiro_result)
+
+
+```
+## Q17 En un Welch t-test para puntaje_final segun modalidad
+El grupo A es la modalidad PRESENCIAL
+El grupo B es la modalidad VIRTUAL
+
+```{r}
+# ======================
+#Prueba t sin asumir igualdad de varianzas (Welch's t-test)
+# ======================
+cat("=== Prueba t con varianzas diferentes (Welch's t-test) ===\n")
+
+puntaje_presencial <- select(filter(cohorte_estudio, modalidad == "Presencial"), puntaje_final)
+puntaje_virtual <- select(filter(cohorte_estudio, modalidad == "Virtual"), puntaje_final)
+
+# ----------------------
+# Paso 1: Diferencia observada entre las medias
+# ----------------------
+puntaje_presencial <- as.numeric(unlist(puntaje_presencial))
+puntaje_virtual <- as.numeric(unlist(puntaje_virtual))
+media_A <- mean(puntaje_presencial)
+media_B <- mean(puntaje_virtual)
+diff_obs <- media_B - media_A
+
+
+# varianzas muestrales de cada grupo
+var_A <- var(puntaje_presencial)
+var_B <- var(puntaje_virtual)
+
+
+# error estándar sin asumir igualdad:
+# Fórmula: SE = sqrt( var_A/n1 + var_B/n2 )
+n1 <- length(puntaje_presencial)
+n2 <- length(puntaje_virtual)
+
+SE_welch <- sqrt(var_A/n1 + var_B/n2)
+cat("Error estándar (Welch):", round(SE_welch, 2), "\n\n")
+
+
+# El estadístico t para Welch
+t_stat_welch <- diff_obs / SE_welch
+cat("Estadístico t (Welch):", round(t_stat_welch, 2), "\n\n")
+
+```
+```{r}
+
+grupo_A <- as.numeric(unlist(puntaje_presencial))
+grupo_B <- as.numeric(unlist(puntaje_virtual))
+
+# Varianzas diferentes (Welch) - Alternativa A > B
+t.test( grupo_A, grupo_B, var.equal = FALSE, type="two.sample",alternative = "greater")
+```
+
+## Q18  En el test chi-cuadrado de independencia entre modalidad y aprobado, el p-valor es
+
+```{r}
+# Crear la tabla de contingencia
+tabla_contingencia <- table(modalidad, aprobado)
+print(tabla_contingencia)
+
+# Realizar el test de chi-cuadrado de independencia
+test_independencia <- chisq.test(tabla_contingencia)
+print(test_independencia)
+```
+
+## Q19. Cuantos grados de libertad tendria nuestra distribucion chi cuadrado para el test si hubiera 4 modalidades de cursada (en vez de solo presencial y virtual) y hubiera 3 posibles çategorias.en aprobado
+
+(f-1)*(c-1)= > (4-1) * (3-1) = 6
+
+## Q20. Para el test chi-cuadrado entre sede y aprobado
+
+```{r}
+# Crear la tabla de contingencia
+tabla_contingencia <- table(sede, aprobado)
+print(tabla_contingencia)
+
+# Realizar el test de chi-cuadrado de independencia
+test_independencia <- chisq.test(tabla_contingencia)
+print(test_independencia)
+```
+
+# Dixon y outliers
+Usa la muestra chica de Dixon. Para la decision final, toma Qcrit = 0.338 (n = 15, alpha = 0.05).
+```{r}
+library(outliers)  # Para test de Grubbs y Dixon
+dixon <- read_delim("./dataTP2/TP2_AID_2026_muestra_dixon.csv", delim = ",", trim_ws = TRUE)
+```
+
+
+## Q21. En TP2_AID_2026_muestra_dixon.csv, cual es el valor que aparece como candidato natural a outlier por el extremo alto?
+
+```{r}
+ggplot(dixon, aes(y = medicion)) +
+  geom_boxplot(fill = "lightblue") +
+  labs(title = "Boxplot de variable1", y = "variable1") +
+  theme_minimal()
+```
+```{r}
+# Contar la cantidad de datos no nulos (sin NA)
+sample_size <- sum(!is.na(dixon$medicion))
+
+# Aplicar la prueba de Dixon solo si la muestra es <= 30
+if (sample_size > 30) {
+  submuestra <- sample(na.omit(dixon$medicion), 30)  # Seleccionar una submuestra de 30 elementos
+  dixon_result <- dixon.test(submuestra)  # Aplicar test de Dixon
+  print(dixon_result)
+} else {
+  dixon_result <- dixon.test(na.omit(dixon$medicion))  # Aplicar test directamente
+  print(dixon_result)
+}
+```
+## Q22
+```{r}
+dixon_ordenado <- dixon[order(dixon$medicion),]
+
+for (i in c(0:13)) {
+  print((dixon_ordenado[2+i, 2] - dixon_ordenado[1+i, 2])/(max(dixon$medicion)-min(dixon$medicion)))
+}
+
+
+```
+
+## Q23. Tomando n = 15 y Qcrit = 0.338 para alpha = 0.05, cual es la conclusion?
+
+```{r}
+
+# Aplicar la prueba de Dixon solo si la muestra es <= 30
+  submuestra <- sample(na.omit(dixon$medicion), 15)  # Seleccionar una submuestra de 15 elementos
+  dixon_result <- dixon.test(submuestra)  # Aplicar test de Dixon
+  print(dixon_result)
+
+```
+## Q24. El promedio de las mediciones excluyendo 55.4 es mas cercano a
+```{r}
+dixon_ordenado$medicion <- as.numeric(dixon_ordenado$medicion)
+mean(dixon_ordenado$medicion[1:14])
+```
+# Bootstrap
+
+## Q25. Usando la libreria boot, se quiere entender la variabilidad de la mediana de puntaje_final. Cual
+seria un intervalo razonable 10 % a 90 % para la mediana haciendo un millon de replicas con el dataset
+original. El intervalo es mas cercano a:
+```{r}
+library(boot)
+
+# Definir función para calcular la media del consumo de combustible
+media_fn <- function(data, indices) {
+  return(median(data[indices], na.rm = TRUE))
+}
+
+# Aplicar bootstrapping con 1 000 000 replicaciones
+set.seed(2026)
+boot_result <- boot(data = puntaje_final, statistic = media_fn, R = 1000000)
+print(boot_result)
+plot(boot_result)
+```
+```{r}
+boot.ci(boot_result,conf=0.80 ,type = "perc",)
+
+```
+
+# E. Distancias
+Estandarizando horas_estudio, asistencia_pct, ansiedad_score y promedio_prev sobre toda la cohorte,
+```{r}
+# Estandarización manual utilizando scale()
+cohorte_estudio$horas_estudio_std <- scale(cohorte_estudio$horas_estudio)
+cohorte_estudio$asistencia_pct_std <- scale(cohorte_estudio$asistencia_pct)
+cohorte_estudio$ansiedad_score_std <- scale(cohorte_estudio$ansiedad_score)
+cohorte_estudio$promedio_prev_std <- scale(cohorte_estudio$promedio_prev)
+
+#summary(cohorte_estudio[,13:17])
+cohorte_estudio[,14:17]
+```
+## Q30. Cual es la distancia euclidea entre E014 y E120? Responde con dos decimales.
+```{r}
+x <- cohorte_estudio[14,14:17]
+y <- cohorte_estudio[120,14:17] 
+
+round(sqrt(sum((x - y)^2)),2)
+```
+## Q31. Con esas mismas cuatro variables estandarizadas, cual es la distancia Manhattan entre E014 y
+E120?
+```{r}
+round(sum(abs(x - y)),2)
+```
+## Q32. Con esas mismas cuatro variables estandarizadas, la distancia Chebyshev entre E014 y E120 es
+mas cercana a
+```{r}
+round(max(abs(x - y)),2)
+```
+## Q35. Sean los siguientes vectores en R4
+a = (8, 16, 8, 16), b = (2, 5, 2, 5), c = (4, 1, 4, 1)
+```{r}
+a <- c(8, 16, 8, 16)
+b <- c(2, 5, 2, 5)
+c <- c(4, 1, 4, 1)
+
+cos_sim <- function(x, y) {
+  sum(x * y) / (sqrt(sum(x^2)) * sqrt(sum(y^2)))
+}
+
+
+ab <- cos_sim(a,b)
+ac <- cos_sim(a,c)
+bc <- cos_sim(b,c)
+
+```
+
