@@ -1,0 +1,141 @@
+---
+title: "AID_TP3"
+author: "Maximiliano Bustos"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+# Datos
+Fifa 2024
+
+```{r}
+library(readr)
+library(tidyverse)
+library(kableExtra)
+```
+## LOAD - 
+```{r}
+base_fifa2024 <- read_delim("./data/base_fifa2024.csv", delim = ",", trim_ws = TRUE)
+```
+
+```{r}
+spec(base_fifa2024)
+```
+
+
+```{r}
+# Valores faltantes
+sum(is.na(base_fifa2024))# para saber cuantos na hay en la base de datos
+
+# Duplicados
+any(duplicated(base_fifa2024))
+
+```
+
+```{r}
+#Matriz de correlación
+library(corrplot)
+
+m_cor <- cor(base_fifa2024) 
+
+# representa la matriz de correlaciones mediante círculos
+corrplot(m_cor,
+         method="circle",
+         type = "upper",
+         diag= FALSE) 
+```
+
+## Matriz de Varianzas y covarianzas
+```{r}
+m_cov <-round(cov(base_fifa2024),2)
+
+m_cov |> knitr::kable(format = "html") |> 
+  kable_styling() 
+```
+
+## PCA
+```{r}
+pca <- prcomp(base_fifa2024,
+              scale = TRUE)# con datos estandarizados
+names(pca)
+```
+## Cargas o loadings
+```{r}
+
+
+round(pca$rotation,2) |> knitr::kable(format = "html") |> 
+  kable_styling() 
+```
+
+```{r}
+contrib <- as.matrix(round(pca$rotation,2))
+corrplot(contrib,is.corr=FALSE)
+```
+
+
+```{r}
+#loadings
+
+carga1 = data.frame(cbind(X=1:length(base_fifa2024),
+                          primeracarga=data.frame(pca$rotation)[,1]))
+carga2 = data.frame(cbind(X=1:length(base_fifa2024),
+                          segundacarga=data.frame(pca$rotation)[,2]))
+cbind(carga1,carga2)
+```
+## 19) Scores
+  ¿Cuál es el valor del score del individuo 20 en PC1 y en PC2? (PC1; PC2)
+
+```{r}
+pca$x[20,1:2]# scores para la primer componente (PC1)
+```
+## 20)  ¿Cuántas componentes son necesarias para explicar el 80% de la varianza?
+```{r}
+library(factoextra)
+
+fviz_eig(pca, ncp =11, addlabels = TRUE, main="")
+```
+## 21)¿Cuál de las siguientes variables tiene mayor contribución (en valor absoluto) en PC1?
+```{r}
+ggplot(carga1, aes(colnames(base_fifa2024) ,primeracarga)) + 
+       geom_bar (stat="identity" , 
+       position="dodge" ,
+       fill ="royalblue" ,
+       width =0.5 ) + xlab( 'Variables' ) + ylab('Primera carga' )+ theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+## 22-  ¿Qué par de variables presenta asociación negativa en el biplot?
+
+```{r}
+library(ggfortify)
+
+autoplot(pca, 
+         data = base_fifa2024, 
+         loadings = TRUE, 
+         loadings.colour = 'black',
+         loadings.label = TRUE, 
+         loadings.label.size = 5)
+```
+## 29) Según el criterio de kaiser, ¿cuántas componentes principales debería retener?
+```{r}
+screeplot(pca, type = "l", npcs = 11)
+abline(h = 1, col="red", lty=5)
+legend("topright", legend=c("Eigenvalue = 1"),
+       col=c("red"), lty=5, cex=0.6)
+```
+## 30) Aplique la técnica robusta del Minimo Determinante de la Covarianza (MCD) a los datos para realizar el PCA. ¿Qué porcentaje de la varianza es explicado por la primer componente?
+
+```{r}
+#############################################
+#Mínimo Determinante de la Covariancia (MCD)
+#############################################
+
+pca_mcd <-princomp(base_fifa2024, 
+                   cor=TRUE,
+                   scores=TRUE,
+                   covmat=MASS::cov.mcd(base_fifa2024))#se especifica MCD
+summary(pca_mcd)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
