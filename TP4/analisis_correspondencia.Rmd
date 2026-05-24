@@ -1,0 +1,95 @@
+---
+title: "AID TP4"
+author: "Maximiliano Bustos"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Importo librerías:
+```{r}
+library(readr)
+library(tidyverse)
+library(FactoMineR)
+library(factoextra)
+```
+# LOAD
+```{r}
+obesidad <- read_delim("./data/obesidad_sample.csv", delim = ",", trim_ws = TRUE)
+```
+
+
+# 11) Se realizó una prueba de independencia entre las variables categóricas SMOKE y MTRANS. ¿Cuál de las siguientes afirmaciones es correcta?
+
+```{r}
+# Tabla de contingencia
+tabla <- table(obesidad$SMOKE, obesidad$MTRANS)
+print(tabla)
+
+# Test Chi-cuadrado
+chisq.test(tabla)
+
+
+```
+# 12) Respecto a la prueba Chi-cuadrado de independencia realizada entre SMOKE y MTRANS, indique si la siguiente afirmación es verdadera o falsa:
+“El resultado del test es completamente confiable porque se cumplen todos los supuestos necesarios de la prueba.”
+```{r}
+
+# Ver frecuencias esperadas
+test <- chisq.test(tabla)
+test$expected
+
+# Revisar si todas las esperadas son >= 5
+all(test$expected >= 5)
+```
+# 13) Categorice la variable AGE en tres grupos utilizando los cuantiles de la distribución (terciles). Puede denominar a estas nuevas categorías en JOVEN, ADULTO y MAYOR. Luego realice un ACS entre esta nueva variable creada a partir de AGE y NObeyesdad.
+
+Segun el biplot del ACS, ¿que categorıa de edad parece asociarse mas con Obesity Type III?
+
+
+```{r}
+
+x <- obesidad$Age
+
+# Calcular los puntos de corte (33% y 66%)
+cortes <- quantile(x, probs = c(1/3, 2/3))
+
+# Crear variable categórica con terciles
+terciles <- cut(x,
+                breaks = c(-Inf, cortes[1], cortes[2], Inf),
+                labels = c("JOVEN", "ADULTO", "MAYOR"))
+
+# Tabla de contingencia
+tabla <- table(obesidad$NObeyesdad, terciles)
+print(tabla)
+
+tabla.ca <- CA(tabla, graph = FALSE)
+```
+```{r}
+# Análisis de correspondencias de filas y columnas en simultáneo
+fviz_ca_biplot(tabla.ca) +
+ theme(axis.text.x = element_text(angle=0)) + labs(title = 'Biplot de Análisis de Correspondencia Housetasks')+theme(panel.background = element_rect(fill = "grey95"))
+```
+
+
+# 16)Realice un MCA con las variables GENDER, NObeyesdad y family history with overweight.
+Según el biplot del MCA, ¿qué categoría de tipo de obesidad parece asociarse más
+con la ausencia de historia familiar previa de obesidad?
+
+```{r}
+
+obesidad_gender_Nobes_fliahist <-  select(obesidad, Gender, NObeyesdad,family_history_with_overweight)
+obesidad_mca <- MCA(obesidad_gender_Nobes_fliahist, graph=F)
+summary(obesidad_mca)
+```
+```{r}
+# Análisis de variables según representatividad
+fviz_mca_var(obesidad_mca,
+             invisible="quali", 
+             repel = TRUE,
+             alpha.var="cos2")
+```
+
